@@ -7,14 +7,22 @@
 enum class TokenType { 
     ABRIR,
     CERRAR,
-    NUMBER,
+    INT_LIT,
     IDENTIFIER,
     ASSIGN,
     COMPARE,
+    UNDEF
+};
+
+enum class CoolBool {
+    TRUE,
+    FALSE,
+    IND = -1,
 };
 
 struct Token {
     TokenType _type;
+    int pos;
     std::optional<std::string> value = std::nullopt;
 };
 
@@ -48,17 +56,17 @@ public:
                 }
 
                 if (buf == "ABRIR") {
-                    tokens.push_back({TokenType::ABRIR});
+                    tokens.push_back({TokenType::ABRIR, _index});
 
                     buf.clear();
                     continue;
 
                 } else if (buf == "CERRAR") {
                     if (std::isspace(peek(-7).value())) {
-                        tokens.push_back({TokenType::CERRAR});
+                        tokens.push_back({TokenType::CERRAR, _index});
                     }
                     else {
-                        std::cout << "Missing space before token CERRAR" << std::endl;
+                        std::cerr << "Missing space before token CERRAR" << std::endl;
                         exit(1);
                     }
 
@@ -66,7 +74,7 @@ public:
                     continue;
 
                 } else {
-                    tokens.push_back({TokenType::IDENTIFIER, buf});
+                    tokens.push_back({TokenType::IDENTIFIER, _index,buf});
 
                     buf.clear();
                     continue;
@@ -82,7 +90,7 @@ public:
                     buf.push_back(consume().value());
                 }
 
-                tokens.push_back({TokenType::NUMBER, buf});
+                tokens.push_back({TokenType::INT_LIT, _index,buf});
 
                 buf.clear();
                 continue;
@@ -93,10 +101,10 @@ public:
                 if (peek().has_value() && peek().value() == '=') {
                     buf.push_back(consume().value());
 
-                    tokens.push_back({TokenType::COMPARE, buf});
+                    tokens.push_back({TokenType::COMPARE,_index, buf});
                 }
                 else {
-                    tokens.push_back({TokenType::ASSIGN});
+                    tokens.push_back({TokenType::ASSIGN, _index});
                 }
                 buf.clear();
                 continue;   
@@ -107,7 +115,7 @@ public:
                 if (peek().has_value() && peek().value() == '=') {
                     buf.push_back(consume().value());
                 }
-                tokens.push_back({TokenType::COMPARE, buf});
+                tokens.push_back({TokenType::COMPARE, _index, buf});
                 buf.clear();
                 continue;
             }
@@ -116,11 +124,11 @@ public:
 
                 if (peek().has_value() && peek().value() == '=') {
                     buf.push_back(consume().value());
-                    tokens.push_back({TokenType::COMPARE, buf});
+                    tokens.push_back({TokenType::COMPARE, _index, buf});
                 }
                 else {
-                    std::cout << "Error, invalid character at position " << _index << ": " << buf << std::endl;
-                    exit(1);
+                    std::cerr << "Error, invalid character at position " << _index << ": " << buf << std::endl;
+                    tokens.push_back({TokenType::UNDEF, _index, buf});
                 }
                 buf.clear();
                 continue;
@@ -133,61 +141,153 @@ public:
 
             else {
                 buf.push_back(consume().value());
-                std::cout << "Error, invalid character at position " << _index << ": " << buf << std::endl;
+                std::cerr << "Error, invalid character at position " << _index << ": " << buf << std::endl;
 
-                exit(1);
+                tokens.push_back({TokenType::UNDEF, _index, buf});
             }
         }
         _index = 0;
         return tokens;
     }
 
-    bool validate(std::vector<Token> tokens = {}) {
+    int evaluate(std::vector<Token> tokens = {}) {
         if (tokens.empty()) {
             tokens = tokenize();
         }
-        // tokens must have exactly 7 elements
-        if (tokens.size() != 7) {
-            std::cout << "Error, expected 7 tokens, got " << tokens.size() << std::endl;
-            return false;
+        if (!validate(tokens)) return -1;
+            
+
+        int first = std::stoi(tokens[3].value.value());
+        int second = std::stoi(tokens[5].value.value());
+
+        std::string operand = tokens[4].value.value();
+        if(operand == "==") return first == second;
+        else if (operand == ">") return first > second;
+        else if (operand == "<") return first < second;
+        else if (operand == "<=") return first <= second;
+        else if (operand == ">=") return first  >= second;
+
+        return -1;
+    }
+
+    bool validate(std::vector<Token> tokens = {}) {
+        bool validity = true;
+        if (tokens.empty()) {
+            tokens = tokenize();
         }
-        // the first token must be ABRIR
         if (tokens[0]._type != TokenType::ABRIR) {
-            std::cout << "Error, expected ABRIR at position 0" << std::endl;
+            std::cout << "Error, expected ABRIR at position 0, got " << token_type_to_string(tokens[0]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[0].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
+            
             return false;
         }
         // the last token must be CERRAR
         if (tokens[tokens.size() - 1]._type != TokenType::CERRAR) {
-            std::cout << "Error, expected CERRAR at position " << tokens.size() - 1 << std::endl;
+            std::cout << "Error, expected CERRAR as last token, got " << token_type_to_string(tokens[tokens.size() - 1]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[tokens.size() - 1].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
             return false;
         }
 
         // second token must be an IDENTIFIER
         if (tokens[1]._type != TokenType::IDENTIFIER) {
-            std::cout << "Error, expected IDENTIFIER as second token" << std::endl;
+            std::cout << "Error, expected IDENTIFIER at position " << tokens[1].pos << " got " << token_type_to_string(tokens[1]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[1].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
             return false;
         }
 
         // third token must be an ASSIGN
         if (tokens[2]._type != TokenType::ASSIGN) {
-            std::cout << "Error, expected ASSIGN as third token" << std::endl;
+            std::cout << "Error, expected ASSIGN at position " << tokens[2].pos << " got " << token_type_to_string(tokens[2]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[2].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
             return false;
         }
         // fourth  token must be a NUMBER
-        if (tokens[3]._type != TokenType::NUMBER) {
-            std::cout << "Error, expected NUMBER as fourth token" << std::endl;
+        if (tokens[3]._type != TokenType::INT_LIT) {
+            std::cout << "Error, expected NUMBER at position " << tokens[3].pos << " got " << token_type_to_string(tokens[3]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[3].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
+            
             return false;
         }
-        if (tokens[5]._type != TokenType::NUMBER) {
-            std::cout << "Error, expected NUMBER as sixth token" << std::endl;
+        if (tokens[5]._type != TokenType::INT_LIT) {
+            std::cout << "Error, expected NUMBER at position " << tokens[5].pos << " got " << token_type_to_string(tokens[5]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[5].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
             return false;
         }
         // fifth token must be a COMPARE
         if (tokens[4]._type != TokenType::COMPARE) {
-            std::cout << "Error, expected COMPARE as fifth token" << std::endl;
+            std::cout << "Error, expected COMPARE at position " << tokens[4].pos << " got " << token_type_to_string(tokens[4]) << std::endl;
+            std::cout << _input << std::endl;
+            // print a ^ under the error
+            for (int i = 0; i < tokens[4].pos -1; i++) {
+                std::cout << " ";
+            }
+            std::cout<< "^" << std::endl;
+            return false;
+        }
+        if (tokens.size() != 7) {
+            std::cout << "Error, expected 7 tokens, got " << tokens.size() << std::endl;
             return false;
         }
         return true;
+    }
+
+    std::string token_type_to_string(Token token) {
+        switch (token._type)
+        {
+        case TokenType::ABRIR:
+            return "ABRIR";
+            break;
+        case TokenType::ASSIGN:
+            return "ASSIGN";
+            break;
+        case TokenType::CERRAR:
+            return "CERRAR";
+            break;
+        case TokenType::COMPARE:
+            return "COMPARE";
+            break;
+        case TokenType::IDENTIFIER:
+            return "IDENTIFIER: " + token.value.value();
+            break;
+        case TokenType::INT_LIT:
+            return "INT_LIT: " + token.value.value();
+            break;
+        case TokenType::UNDEF:
+            return "UNDEF: " + token.value.value();
+        default:
+            break;
+        }
+        return "";
     }
 
     void tokens_to_file(std::ofstream& OutputFile, std::vector<Token> tokens={}) {
@@ -210,9 +310,10 @@ public:
             case TokenType::IDENTIFIER:
                 OutputFile << "IDENTIFIER: " << token.value.value() << std::endl;
                 break;
-
-            case TokenType::NUMBER:
-                OutputFile << "NUMBER: " << token.value.value() << std::endl;
+            case TokenType::UNDEF:
+                OutputFile << "UNDEFINED CHARACTER: " << token.value.value() << std::endl;
+            case TokenType::INT_LIT:
+                OutputFile << "INT_LIT: " << token.value.value() << std::endl;
                 break;
             case TokenType::ASSIGN:
                 OutputFile << "ASSIGN" << std::endl;

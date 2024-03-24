@@ -3,7 +3,7 @@
 #include <string>
 
 int main() {
-    char c = '1';
+    char c = '-';
 
     std::cout << "c: " << std::isdigit(c) << std::endl;
 

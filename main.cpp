@@ -14,21 +14,27 @@ int main()
 
     std::getline(std::cin, to_eval);
 
-    Tokenizer tokenizer(to_eval);
+    Tokenizer tokenizer(std::move(to_eval));
 
     std::vector<Token> tokens = tokenizer.tokenize();
 
-    bool is_valid = tokenizer.validate(tokens);
+    int result = tokenizer.evaluate(tokens);
 
-    if (is_valid) {
-        std::cout << "Valid" << std::endl;
-    } else {
-        std::cout << "Invalid" << std::endl;
-    }
 
     std::ofstream Output("tokens.txt");
 
-    tokenizer.tokens_to_file(Output, tokens);
+    if (result == -1) {
+        std::cerr << "Could not evaluate" << std::endl;
+    } else if (result) {
+        std::cout << "True" << std::endl;
+        tokenizer.tokens_to_file(Output, tokens);
+        Output << "True" << std::endl;
+    } else {
+        std::cout << "False" << std::endl;
+        tokenizer.tokens_to_file(Output, tokens);
+        Output << "False" << std::endl;
+
+    }
 
     Output.close();
 }
